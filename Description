@@ -1,0 +1,9 @@
+This is a simple Counter app that I'm using to study passing data using binding and state.
+
+Basic Features only
+    - incriment
+    - Decrement
+    - Reset
+
+
+Im planning on further enhancements in the future
