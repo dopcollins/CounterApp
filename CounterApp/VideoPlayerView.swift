@@ -11,70 +11,60 @@ import AVKit
 
 struct VideoPlayerView: UIViewRepresentable {
     let videoName: String
-    
-    func makeUIView(context: Context) -> UIView {
+
+    func makeUIView(context: Context) -> PlayerUIView {
         return PlayerUIView(videoName: videoName)
     }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    func updateUIView(_ uiView: PlayerUIView, context: Context) {
+        // Handle video name changes here if needed
+    }
 }
 
 class PlayerUIView: UIView {
-    private var playerLayer: AVPlayerLayer?
-    private var player: AVPlayer?
-    
+    private var playerLayer = AVPlayerLayer()
+    private var playerLooper: AVPlayerLooper?
+    private var queuePlayer: AVQueuePlayer?
+
     init(videoName: String) {
         super.init(frame: .zero)
-        
-        // Try multiple extensions
-        let extensions = ["mp4", "mov", "m4v", "MP4", "MOV"]
-        var videoURL: URL?
-        
-        for ext in extensions {
-            if let path = Bundle.main.path(forResource: videoName, ofType: ext) {
-                videoURL = URL(fileURLWithPath: path)
-                print("✅ Found video: \(videoName).\(ext)")
-                break
-            }
-        }
-        
-        guard let url = videoURL else {
-            print("❌ Video file '\(videoName)' not found in bundle")
-            print("Available files:", Bundle.main.paths(forResourcesOfType: nil, inDirectory: nil))
-            return
-        }
-        
-        player = AVPlayer(url: url)
-        player?.isMuted = true  // Mute the video
-        
-        playerLayer = AVPlayerLayer(player: player)
-        playerLayer?.videoGravity = .resizeAspectFill
-        layer.addSublayer(playerLayer!)
-        
-        // Loop video
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: player?.currentItem,
-            queue: .main
-        ) { [weak self] _ in
-            self?.player?.seek(to: .zero)
-            self?.player?.play()
-        }
-        
-        player?.play()
+        setupPlayer(videoName: videoName)
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
+    private func setupPlayer(videoName: String) {
+        // Find resource
+        let extensions = ["mp4", "mov", "m4v"]
+        guard let url = extensions.compactMap({ Bundle.main.url(forResource: videoName, withExtension: $0) }).first else {
+            print("❌ Video file '\(videoName)' not found.")
+            return
+        }
+
+        let asset = AVAsset(url: url)
+        let playerItem = AVPlayerItem(asset: asset)
+
+        // Setup QueuePlayer for looping
+        let player = AVQueuePlayer(playerItem: playerItem)
+        player.isMuted = true
+        self.queuePlayer = player
+
+        // Use AVPlayerLooper for seamless looping
+        playerLooper = AVPlayerLooper(player: player, templateItem: playerItem)
+
+        playerLayer.player = player
+        playerLayer.videoGravity = .resizeAspectFill
+        layer.addSublayer(playerLayer)
+
+        player.play()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        playerLayer?.frame = bounds
+        playerLayer.frame = bounds
     }
     
-    deinit {
-        player?.pause()
-        NotificationCenter.default.removeObserver(self)
-    }
+    // Cleanup is handled by the deinit of the class
 }
